@@ -1,0 +1,16 @@
+{
+  "model": "saved_models/E_body_dist0_s2/ppo_snake_final.pth",
+  "state_mode": "body",
+  "games": 5,
+  "seed": 1000,
+  "scores": [
+    77,
+    72,
+    81,
+    73,
+    48
+  ],
+  "mean": 70.2,
+  "max": 81,
+  "min": 48
+}

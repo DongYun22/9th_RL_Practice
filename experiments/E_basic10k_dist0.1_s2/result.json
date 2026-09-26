@@ -1,0 +1,7 @@
+{
+  "exp_name": "E_basic10k_dist0.1_s2",
+  "episodes": 10000,
+  "total_steps": 7303338,
+  "last500_mean_score": 32.034,
+  "total_minutes": 12.898331415653228
+}

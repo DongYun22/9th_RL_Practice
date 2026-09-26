@@ -13,7 +13,7 @@ import os
 from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 from PPO_code import PPO, RolloutBuffer
-from snake_code import SnakeGame
+from snake_code import SnakeGame, STATE_DIMS
 
 def set_seed(seed):
     # 재현성을 위해 파이썬/넘파이/토치 난수를 모두 고정
@@ -23,7 +23,8 @@ def set_seed(seed):
 
 def train(policy_path = "", episodes = 10000, exp_name = None, dist_reward = 0.1,
           lr = 0.0003, gamma = 0.99, epochs = 4, eps_clip = 0.2,
-          update_timestep = 2000, entropy_coef = 0.01, seed = 0, allow_existing = False):
+          update_timestep = 2000, entropy_coef = 0.01, seed = 0, allow_existing = False,
+          state_mode = "basic"):
     if exp_name is None:
         exp_name = datetime.now().strftime("manual_%Y%m%d_%H%M%S")
 
@@ -42,6 +43,7 @@ def train(policy_path = "", episodes = 10000, exp_name = None, dist_reward = 0.1
         "exp_name": exp_name, "episodes": episodes, "seed": seed, "policy_path": policy_path,
         "dist_reward": dist_reward, "lr": lr, "gamma": gamma, "epochs": epochs,
         "eps_clip": eps_clip, "update_timestep": update_timestep, "entropy_coef": entropy_coef,
+        "state_mode": state_mode,
     }
     config_text = json.dumps(config, indent=2, ensure_ascii=False)
     os.makedirs(exp_dir, exist_ok=True)
@@ -53,8 +55,8 @@ def train(policy_path = "", episodes = 10000, exp_name = None, dist_reward = 0.1
     writer.add_text('config', "\n".join("    " + line for line in config_text.splitlines()))
 
     # 초기화
-    env = SnakeGame(dist_reward=dist_reward)
-    state_dim = 11  # 예: 뱀의 상태 데이터 크기
+    env = SnakeGame(dist_reward=dist_reward, state_mode=state_mode)
+    state_dim = STATE_DIMS[state_mode]  # basic: 11, body: 21 (뱀의 상태 데이터 크기)
     action_dim = 3  # 예: 직진, 좌, 우
     ppo_agent = PPO(state_dim, action_dim, lr=lr, gamma=gamma, epochs=epochs, eps_clip=eps_clip, entropy_coef=entropy_coef)
     memory = RolloutBuffer()
@@ -176,9 +178,11 @@ if __name__ == '__main__':
     parser.add_argument('--entropy_coef', type=float, default=0.01)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--policy_path', type=str, default='')
+    parser.add_argument('--state_mode', type=str, default='basic', choices=list(STATE_DIMS), help='basic: 기존 11개 상태, body: 몸통 정보 10개 추가')
     parser.add_argument('--allow_existing', action='store_true', help='이미 있는 실험 이름 폴더에도 쓰기 허용 (중단된 실험 재시작용)')
     args = parser.parse_args()
     train(policy_path=args.policy_path, episodes=args.episodes, exp_name=args.exp_name,
           dist_reward=args.dist_reward, lr=args.lr, gamma=args.gamma, epochs=args.epochs,
           eps_clip=args.eps_clip, update_timestep=args.update_timestep,
-          entropy_coef=args.entropy_coef, seed=args.seed, allow_existing=args.allow_existing)
+          entropy_coef=args.entropy_coef, seed=args.seed, allow_existing=args.allow_existing,
+          state_mode=args.state_mode)

@@ -34,3 +34,5 @@
 
 
 ※ 실험당 seed 1개, 평가 5판이라 우연의 영향이 있어 작은 점수 차이는 유의미하지 않을 수 있습니다.
+
+※ 갱신: 이 표는 기존 상태(basic, 11개) 실험 기준입니다. 이후 몸통 정보 상태(body, 21개) 실험(`results_state_body.md`, `results_state_parity.md`)에서 더 높은 모델이 나와 `best_model/` 은 `E_body_dist0.1_s0` (원본 `saved_models/E_body_dist0.1_s0/ppo_snake_final.pth`, 새 난수 100판 평가 평균 89.9)로 교체했습니다. 위 "최고 모델" 줄의 A_dist0 원본은 `saved_models/A_dist0/` 에 그대로 있습니다.

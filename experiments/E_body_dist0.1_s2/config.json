@@ -1,7 +1,7 @@
 {
-  "exp_name": "E_body_dist0.1_s0",
+  "exp_name": "E_body_dist0.1_s2",
   "episodes": 10000,
-  "seed": 0,
+  "seed": 2,
   "policy_path": "",
   "dist_reward": 0.1,
   "lr": 0.0003,

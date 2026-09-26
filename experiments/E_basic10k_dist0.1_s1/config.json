@@ -1,7 +1,7 @@
 {
-  "exp_name": "E_body_dist0.1_s0",
+  "exp_name": "E_basic10k_dist0.1_s1",
   "episodes": 10000,
-  "seed": 0,
+  "seed": 1,
   "policy_path": "",
   "dist_reward": 0.1,
   "lr": 0.0003,
@@ -10,5 +10,5 @@
   "eps_clip": 0.2,
   "update_timestep": 2000,
   "entropy_coef": 0.01,
-  "state_mode": "body"
+  "state_mode": "basic"
 }

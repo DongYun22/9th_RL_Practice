@@ -1,9 +1,9 @@
 {
-  "exp_name": "E_body_dist0.1_s0",
+  "exp_name": "E_body_dist0_s1",
   "episodes": 10000,
-  "seed": 0,
+  "seed": 1,
   "policy_path": "",
-  "dist_reward": 0.1,
+  "dist_reward": 0.0,
   "lr": 0.0003,
   "gamma": 0.99,
   "epochs": 4,

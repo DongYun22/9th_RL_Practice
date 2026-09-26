@@ -112,3 +112,36 @@
 - **결과**: 세 seed 모두 학습이 진행되어 실패 없음(소요 약 78분, 가장 느린 seed 0 기준). 학습 중 점수의 구간 평균(seed 평균)은 7001~10000: 54.3 → 10001~15000: 54.0 → 15001~20000: 54.2 로 **7000~10000 에피소드 이후 사실상 정체**. seed 별로는 seed 0 79.1/77.0/78.1, seed 1 55.9/55.9/55.5, seed 2 27.8/29.1/29.1. 30판 평가 평균(seed 평균)은 7000: 55.0, 10000: 53.6, 15000: 57.3, 20000: 57.4 로 +2.4 정도지만 seed 1 의 평가 상승(58→66)은 같은 seed 의 학습 곡선이 평평해서 평가 잡음으로 봄(30판 표준오차 약 4~5, 이 해석은 추가 검증하지 않음).
 - **시사점**: 에피소드 수보다 **seed(초기 조건)에 따른 차이가 훨씬 큼**(정체 수준이 seed 별로 약 28 / 56 / 78). 따라서 앞선 7000·10000 에피소드의 순위(A_dist0 vs B_upd1000 등)도 seed 1개로는 확정하기 어렵다는 점이 다시 확인됨.
 - **스모크 추가분**(삭제하지 않고 남김): `experiments/smoke_D_A_dist0_ep1000_s0`, `smoke_D_A_dist0_ep1000_s1`, `experiments/smoke_results_extend_A_dist0_ep1000.md` 와 대응하는 `runs/smoke_D_*`, `saved_models/smoke_D_*`, `logs/smoke_D_*.log`.
+
+## spec 실험 state_body (오케스트레이터 자동 기록)
+
+- 결과 표: `results_state_body.md`, 종료 시각 2026-09-26 23:12:24, 소요 39.1분
+- 학습 완료 8/8, 이번 실행 중 실패: 없음
+
+## spec 실험 state_parity (오케스트레이터 자동 기록)
+
+- 결과 표: `results_state_parity.md`, 종료 시각 2026-09-26 23:31:28, 소요 17.3분
+- 학습 완료 3/3, 이번 실행 중 실패: 없음
+
+## 9. 상태에 몸통 정보 추가 (state_mode=body)
+
+- **동기**: 진단에서 뱀이 사과당 최단 거리의 1.6~2.0배를 걷고, 죽을 때 거의 항상 세 방향이 모두 막혀 있었음(30판 중 27~30건). 기존 상태는 바로 앞 한 칸의 위험 신호만 봄.
+- **구현**(`snake_code.py`): `SnakeGame(state_mode="basic"|"body")`. `basic`(기본값)은 기존 11개 그대로. `body` 는 기존 11개 + 10개 = 21개: 직진/우회전/좌회전 방향으로 도달 가능한 빈 공간(뱀 길이만큼이면 1, 비트보드 flood-fill), 그 방향으로 장애물까지 거리(정규화), 꼬리 위치(좌/우/상/하). `main.py --state_mode`, `evaluate.py` 는 체크포인트 첫 층 입력 크기로 상태 종류를 자동 판별. `play.py` 는 수정하지 않았음(아직 11개 고정이라 body 모델을 읽지 못함).
+- **검증**: (1) basic 모드가 커밋된 원본과 15000스텝에서 상태·보상·종료 모두 동일, (2) 비트보드 flood-fill/거리를 단순 BFS 구현과 무작위 뱀 4000개로 대조해 불일치 0건, (3) 직접 만든 막다른 주머니 상황에서 여유 공간 0.10 으로 계산, (4) best_model 30판 평가 점수 목록이 예전과 동일, (5) 상태 계산 비용은 스텝당 10~30µs.
+- **실험**(`run_experiments.py --spec specs/*.json` 모드를 새로 추가, 결과 표 `results_state_body.md`, `results_state_parity.md`): body 상태 × dist_reward {0, 0.1} × seed {0,1,2}, 10000 에피소드. 기존 basic 과 같은 학습량으로 비교하려고 basic dist_reward 0.1 도 seed 3개를 10000 에피소드로 다시 돌림(7000 시점 값은 이전 실행과 일치해 재현성 확인). 평가는 각 시점 체크포인트 30판(seed 1000+판번호).
+- **결과** (10000 에피소드, 학습 last500 / 평가 30판 평균, seed 평균 / seed별 평가):
+  - basic dist 0: 54.0 / 53.6 (77.2, 57.7, 26.0)
+  - basic dist 0.1: 37.8 / 43.8 (49.4, 46.2, 35.8)
+  - body dist 0: 52.1 / 58.4 (27.0, 83.6, 64.4)
+  - **body dist 0.1: 71.3 / 79.2 (91.7, 64.0, 81.9)**
+- **해석 주의**: body+dist 0.1 은 같은 보상의 basic 보다 seed 3개 모두 높음(가장 낮은 64.0 > basic 의 가장 높은 49.4). 그러나 최고였던 basic dist 0 과의 차이(+25.6)는 seed 편차(basic dist 0 은 26~77) 범위 안이라 seed 3개로는 확정하기 어려움. body 는 10000 에피소드에서도 아직 오르는 중(7000→10000: 50.4→79.2)이고 basic 은 정체라서 학습량을 더 주면 차이가 커질 수도 있으나 검증하지 않았음. body+dist 0 은 초반 학습이 느림(seed 0·2 는 5000 에피소드까지 사과 거의 못 먹음).
+- **진단 재측정**(body 모델 6개, 30판): 죽을 때 세 방향이 막혀 있는 비율(18~30건/30)과 사과당 걸음(1.66~2.56배)은 basic 과 거의 같았음. 즉 점수는 올랐지만 "갇혀서 죽음", "우회 걸음"이 사라진 것은 아님. 또한 앞선 진단에서 "죽는 순간 갇힘"을 몸통 인식 문제의 근거로 든 것은 과한 해석이었음: 몸통이 길어져 판이 붐비면 어떤 정책이든 마지막에는 갇힌 채 죽으므로, 이 지표만으로는 원인을 구분할 수 없음(주머니에 들어가는 시점 자체를 재는 진단이 더 적합).
+- **최고 모델 후보**: `E_body_dist0.1_s0` (10000 에피소드, 30판 평가 91.7, 최저 62~최고 123, last500 81.5). `best_model/` 은 요청이 없어 갱신하지 않았음(현재 best_model 은 30판 평가 77.0).
+- **스모크/파일럿 추가분**(삭제하지 않고 남김): `smoke_body_pilot`, `smoke_body_pilot_d01`(3000 에피소드 파일럿), `experiments/smoke_S_*`, `experiments/smoke_results_specsmoke.md` 와 대응하는 `runs/`, `saved_models/`, `logs/` 항목. 파일럿은 초기 학습 속도가 basic 과 구분되지 않아 판단 근거로는 쓰지 않았음.
+
+## 10. best_model 교체, play.py 수정, 커밋
+
+- **최고 모델 선정**: 이전 30판 평가로 뽑은 1등은 고르는 과정에서 점수가 부풀 수 있어, 후보를 아직 쓰지 않은 난수(seed 5000)로 100판씩 재평가해서 골랐음. `E_body_dist0.1_s0` 89.9(표준오차 1.6, 최저 58~최고 131), `E_body_dist0_s1` 82.0, `E_body_dist0.1_s2` 78.4, 이전 best_model(`A_dist0`, basic) 75.8. 결과는 각 `experiments/{exp}/eval100_seed5000.json`.
+- **best_model 교체**: `best_model/ppo_snake_best.pth`, `best_model/config.json` 을 `E_body_dist0.1_s0`(10000 에피소드, body 상태, dist_reward 0.1, seed 0) 것으로 복사함. 이전 best_model 의 원본은 `saved_models/A_dist0/ppo_snake_final.pth` 에 그대로 있고 이전 config 는 git 이력에 있음. `results.md` 끝에 교체 사실을 덧붙였음.
+- **play.py 수정**(요청에 따라): 모델 경로를 `best_model/ppo_snake_best.pth` 로 바꾸고, 저장된 가중치의 입력 크기로 상태 종류(11: basic, 21: body)를 자동 판별해 환경과 모델을 만들도록 했음. 화면 없이 빠르게 돌리는 래퍼로 body 모델(점수 108)과 기존 basic 모델(점수 77) 모두 로드·플레이됨을 확인. 나머지 동작(렌더링, 확률적 행동 선택)은 그대로.
+- **커밋 범위**: 코드(`snake_code.py`, `main.py`, `evaluate.py`, `run_experiments.py`, `play.py`), 문서(`NOTES.md`, `results*.md`), `specs/*.json`, 새 실험의 설정·결과 JSON(`experiments/E_*` 등), `best_model/`(모델 파일은 `.gitignore` 대상이라 `git add -f`). 스모크/파일럿 산출물(`experiments/smoke_*`)과 `.DS_Store` 는 제외.

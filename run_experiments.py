@@ -77,6 +77,7 @@ class Runner:
         self.episodes = rerun_episodes or (20 if smoke else 7000)
         self.rerun = rerun_episodes is not None
         self.train_timeout = train_timeout_hours * 3600
+        self.milestone_games = MILESTONE_GAMES
         self.concurrency = max(1, min(6, (os.cpu_count() or 2) // 2))
 
         # 스모크 테스트는 본 결과물(NOTES.md, results.md, best_model/)을 건드리지 않고 experiments/ 아래에 둔다
@@ -176,11 +177,13 @@ class Runner:
             if not trained:
                 p = exp["params"]
                 cmd = [self.py, "-u", "-m", "main", "--exp_name", exp_name,
-                       "--episodes", str(self.episodes), "--seed", str(exp["seed"]),
+                       "--episodes", str(exp.get("episodes") or self.episodes), "--seed", str(exp["seed"]),
                        "--dist_reward", str(p["dist_reward"]), "--lr", str(p["lr"]),
                        "--gamma", str(p["gamma"]), "--epochs", str(p["epochs"]),
                        "--eps_clip", str(p["eps_clip"]), "--update_timestep", str(p["update_timestep"]),
                        "--entropy_coef", str(p["entropy_coef"])]
+                if "state_mode" in p:  # 몸통 정보 상태 등 (기본은 basic)
+                    cmd += ["--state_mode", p["state_mode"]]
                 # 이전 시도(중단/실패)가 남긴 폴더가 있으면 재시작 허용 (이 스크립트가 만든 이름에만 해당)
                 if any(x.exists() for x in (ROOT / "runs" / exp_name, ROOT / "saved_models" / exp_name, ed)):
                     cmd.append("--allow_existing")
@@ -211,10 +214,10 @@ class Runner:
             list(pool.map(self.run_experiment, names))
 
     # ---------- 실험 등록 / 요약 ----------
-    def register(self, stage, base_name, overrides, params, changed, seed=SEED):
+    def register(self, stage, base_name, overrides, params, changed, seed=SEED, episodes=None):
         name = self.prefix + base_name
         self.experiments[name] = dict(stage=stage, name=name, overrides=overrides, params=params,
-                                      changed=changed, seed=seed)
+                                      changed=changed, seed=seed, episodes=episodes)
         return name
 
     def summary(self, name):
@@ -412,7 +415,7 @@ class Runner:
             log(f"체크포인트 없음: {name} ep{m}")
             return
         cmd = [self.py, "-u", "evaluate.py", "--model", ckpts[0].relative_to(ROOT).as_posix(),
-               "--games", str(MILESTONE_GAMES), "--seed", str(EVAL_SEED), "--out", f"experiments/{name}/eval_ep{m}.json"]
+               "--games", str(self.milestone_games), "--seed", str(EVAL_SEED), "--out", f"experiments/{name}/eval_ep{m}.json"]
         rc = self.run_logged(name, cmd, timeout=3600)
         if rc != 0 or load_json(out) is None:
             self.record_failure(name, f"evaluate ep{m}", rc)
@@ -489,6 +492,91 @@ class Runner:
                               f"- 학습 완료 {ok}/{len(names)}, 이번 실행 중 실패: {self.failures if self.failures else '없음'}\n")
             log(f"확대 실험 종료: 학습 완료 {ok}/{len(names)}, 실패 {self.failures}")
 
+    # ---------- 실험 목록 파일 모드 (--spec) ----------
+    def run_spec(self, spec_path):
+        """JSON 목록의 실험들을 학습하고, 지정한 에피소드 시점의 체크포인트를 평가해 비교표를 만든다.
+
+        spec 형식: {"name", "episodes", "eval_games", "milestones": [...],
+                    "experiments": [{"name", "seed", "episodes"(선택), "params": {dist_reward, state_mode, ...}}],
+                    "existing": [이미 학습된 비교 대상 실험 이름, ...]}
+        """
+        spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+        self.episodes = spec["episodes"]
+        self.milestone_games = spec.get("eval_games", MILESTONE_GAMES)
+        milestones = spec["milestones"]
+        names = []
+        for e in spec["experiments"]:
+            params = {**BASE, **e.get("params", {})}
+            changed = ", ".join(f"{k}={fmt_value(v)}" for k, v in e.get("params", {}).items())
+            names.append(self.register("S", e["name"], e.get("params", {}), params, changed,
+                                       seed=e.get("seed", SEED), episodes=e.get("episodes")))
+        existing = [self.prefix + n for n in spec.get("existing", [])]
+        name = f"results_{spec['name']}.md"
+        self.results_path = ROOT / "experiments" / f"smoke_{name}" if self.smoke else ROOT / name
+        started = time.time()
+        log(f"spec 실험 시작: {spec['name']}, 새 실험 {len(names)}개 + 비교 대상 {len(existing)}개, 평가 시점 {milestones}")
+        try:
+            self.run_stage(names)
+            items = [(n, m) for n in names + existing for m in milestones]
+            with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
+                list(pool.map(self.eval_checkpoint, items))
+        finally:
+            try:
+                self.write_spec_results(spec, names, existing, milestones)
+            except Exception as e:
+                log(f"results 작성 실패: {e!r}")
+            ok = sum(1 for n in names if load_json(self.exp_dir(n) / "result.json") is not None)
+            self.append_notes(f"\n## spec 실험 {spec['name']} (오케스트레이터 자동 기록)\n\n"
+                              f"- 결과 표: `{self.results_path.relative_to(ROOT).as_posix()}`, "
+                              f"종료 시각 {datetime.now():%Y-%m-%d %H:%M:%S}, 소요 {(time.time() - started) / 60:.1f}분\n"
+                              f"- 학습 완료 {ok}/{len(names)}, 이번 실행 중 실패: {self.failures if self.failures else '없음'}\n")
+            log(f"spec 실험 종료: 학습 완료 {ok}/{len(names)}, 실패 {self.failures}")
+
+    def write_spec_results(self, spec, names, existing, milestones):
+        games = self.milestone_games
+        info = {}
+        for n in names + existing:
+            cfg = load_json(self.exp_dir(n) / "config.json") or {}
+            info[n] = dict(state=cfg.get("state_mode", "basic"), dist=cfg.get("dist_reward"), seed=cfg.get("seed"),
+                           scores=self.tb_scores(n) if (ROOT / "runs" / n).exists() else {})
+
+        def cell(n, m):
+            sc = info[n]["scores"]
+            window = [sc[s] for s in range(m - 499, m + 1) if s in sc]
+            train = sum(window) / 500 if len(window) == 500 else None
+            ev = load_json(self.exp_dir(n) / f"eval_ep{m}.json")
+            return train, (ev["mean"] if ev else None), ev
+
+        f = lambda v: "-" if v is None else f"{v:.1f}"
+        rows, groups = [], {}
+        for n in names + existing:
+            i = info[n]
+            cells = [cell(n, m) for m in milestones]
+            tag = "(기존)" if n in existing else ""
+            rows.append(f"| {n}{tag} | {i['state']} | {fmt_value(i['dist'])} | {i['seed']} | " +
+                        " | ".join(f"{f(t)} / {f(e)}" + (f" ({ev['min']}~{ev['max']})" if ev else "") for t, e, ev in cells) + " |")
+            groups.setdefault((i["state"], i["dist"]), []).append(cells)
+        head = ("| exp_name | 상태 | dist_reward | seed | " + " | ".join(f"@{m} (학습 last500 / 평가 {games}판)" for m in milestones) +
+                " |\n|---|---|---|---|" + "---|" * len(milestones))
+        summary = []
+        for (state, dist), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+            cols = []
+            for j in range(len(milestones)):
+                tr = [r[j][0] for r in rs if r[j][0] is not None]; ev = [r[j][1] for r in rs if r[j][1] is not None]
+                cols.append(f"{f(sum(tr) / len(tr) if tr else None)} / {f(sum(ev) / len(ev) if ev else None)} (n={len(ev)})")
+            summary.append(f"| {state} | {fmt_value(dist)} | " + " | ".join(cols) + " |")
+        shead = ("| 상태 | dist_reward | " + " | ".join(f"@{m} (학습 last500 / 평가 {games}판, seed 평균)" for m in milestones) +
+                 " |\n|---|---|" + "---|" * len(milestones))
+        text = "\n".join([
+            f"# {spec['name']}: 상태 종류 비교\n",
+            f"- 새 실험 episodes={spec['episodes']} (실험별 지정 가능), 평가는 각 시점의 체크포인트를 {games}판씩 (seed {EVAL_SEED}+판번호)",
+            f"- 생성 시각: {datetime.now():%Y-%m-%d %H:%M:%S}\n",
+            "## seed 평균 요약\n", shead + "\n" + "\n".join(summary),
+            "\n## 실험별\n", head + "\n" + "\n".join(rows),
+            "\n※ seed 수가 적어 작은 차이는 우연일 수 있습니다.\n"])
+        atomic_write(self.results_path, text)
+        log(f"results 저장: {self.results_path.relative_to(ROOT)}")
+
 
 def acquire_pidfile(path):
     """중복 실행 방지. pid 파일은 지우지 않고(파일 삭제 금지), 살아 있는 오케스트레이터인지 확인한 뒤 덮어쓴다."""
@@ -517,6 +605,7 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, nargs="+", default=[0], help="--extend 에서 사용할 seed 목록")
     parser.add_argument("--milestones", type=int, nargs="+", default=None,
                         help="--extend 에서 평가할 에피소드 시점 (500의 배수). 기본: 5000, 7000, 10000 이후 5000 간격")
+    parser.add_argument("--spec", type=str, default=None, help="실험 목록 JSON 파일 (예: specs/state_body.json)")
     args = parser.parse_args()
     if (args.rerun_top or args.extend) and not args.episodes:
         parser.error("--rerun_top / --extend 는 --episodes 가 필요합니다")
@@ -526,8 +615,13 @@ if __name__ == "__main__":
 
     runner = Runner(args.smoke, args.train_timeout_hours,
                     rerun_episodes=args.episodes if (args.rerun_top or args.extend) else None)
+    if args.spec:
+        runner.rerun = True  # 별도 pid 파일 사용 (본 실험과 동시 실행 방지 대상 아님)
+        runner.pid_path = runner.pid_path.with_name("orchestrator_spec.pid")
     acquire_pidfile(runner.pid_path)
-    if args.extend:
+    if args.spec:
+        runner.run_spec(args.spec)
+    elif args.extend:
         default_ms = sorted({5000, 7000} | set(range(10000, args.episodes + 1, 5000)))
         runner.run_extend(args.extend, args.seeds, args.milestones or default_ms)
     elif args.rerun_top:

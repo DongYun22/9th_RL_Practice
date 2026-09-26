@@ -1,0 +1,17 @@
+{
+  "name": "state_body",
+  "episodes": 10000,
+  "eval_games": 30,
+  "milestones": [5000, 7000, 10000],
+  "experiments": [
+    {"name": "E_basic_dist0.1_s1", "seed": 1, "episodes": 7000, "params": {"state_mode": "basic", "dist_reward": 0.1}},
+    {"name": "E_basic_dist0.1_s2", "seed": 2, "episodes": 7000, "params": {"state_mode": "basic", "dist_reward": 0.1}},
+    {"name": "E_body_dist0_s0",   "seed": 0, "params": {"state_mode": "body", "dist_reward": 0}},
+    {"name": "E_body_dist0_s1",   "seed": 1, "params": {"state_mode": "body", "dist_reward": 0}},
+    {"name": "E_body_dist0_s2",   "seed": 2, "params": {"state_mode": "body", "dist_reward": 0}},
+    {"name": "E_body_dist0.1_s0", "seed": 0, "params": {"state_mode": "body", "dist_reward": 0.1}},
+    {"name": "E_body_dist0.1_s1", "seed": 1, "params": {"state_mode": "body", "dist_reward": 0.1}},
+    {"name": "E_body_dist0.1_s2", "seed": 2, "params": {"state_mode": "body", "dist_reward": 0.1}}
+  ],
+  "existing": ["D_A_dist0_ep20000_s0", "D_A_dist0_ep20000_s1", "D_A_dist0_ep20000_s2", "A_dist0.1"]
+}

@@ -1,0 +1,16 @@
+{
+  "model": "saved_models/E_basic10k_dist0.1_s1/ppo_snake_final.pth",
+  "state_mode": "basic",
+  "games": 5,
+  "seed": 1000,
+  "scores": [
+    30,
+    35,
+    34,
+    39,
+    27
+  ],
+  "mean": 33.0,
+  "max": 39,
+  "min": 27
+}

@@ -25,11 +25,25 @@ Point = namedtuple('Point', 'x, y')
 BLOCK_SIZE = 20
 SPEED = 40 # 학습 화면을 볼 때의 속도
 
+# 상태 종류별 차원. basic: 기존 11개 / body: basic + 몸통 정보 10개
+STATE_DIMS = {"basic": 11, "body": 21}
+CLOCK_WISE = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
+DIR_DELTA = {Direction.RIGHT: (1, 0), Direction.DOWN: (0, 1), Direction.LEFT: (-1, 0), Direction.UP: (0, -1)}
+
 class SnakeGame:
-    def __init__(self, w=640, h=480, dist_reward=0.1):
+    def __init__(self, w=640, h=480, dist_reward=0.1, state_mode="basic"):
         self.w = w
         self.h = h
         self.dist_reward = dist_reward # 사과에 가까워지면 +dist_reward, 아니면 -dist_reward
+        if state_mode not in STATE_DIMS:
+            raise ValueError(f"state_mode 는 {list(STATE_DIMS)} 중 하나여야 합니다: {state_mode}")
+        self.state_mode = state_mode
+        self.state_dim = STATE_DIMS[state_mode]
+        # 몸통 정보 계산용 격자 비트보드 (가로 한 칸을 더 둬서 좌우 이동이 다음 줄로 넘어가지 않게 함)
+        self.cols = w // BLOCK_SIZE
+        self.rows = h // BLOCK_SIZE
+        self.stride = self.cols + 1
+        self.all_cells = sum(1 << (y * self.stride + x) for y in range(self.rows) for x in range(self.cols))
         # 화면 출력용 (학습 속도를 높이려면 render() 호출을 생략하면 됩니다)
         self.display = pygame.display.set_mode((self.w, self.h))
         pygame.display.set_caption('Snake RL')
@@ -185,7 +199,55 @@ class SnakeGame:
             self.food.y < self.head.y,  # Food up
             self.food.y > self.head.y   # Food down
         ]
-        return np.array(state, dtype=int)
+        if self.state_mode == "basic":
+            return np.array(state, dtype=int)
+        return np.concatenate([np.array(state, dtype=np.float32), self._body_features()])
+
+    def _reachable(self, seed, free, need):
+        # seed 칸에서 상하좌우로 퍼져 나가며 도달 가능한 빈 칸 수 (need 칸 이상이면 거기서 멈춤)
+        reach = seed
+        while True:
+            grown = (reach | (reach << 1) | (reach >> 1) | (reach << self.stride) | (reach >> self.stride)) & free
+            if grown == reach:
+                break
+            reach = grown
+            if reach.bit_count() >= need:
+                break
+        return min(reach.bit_count(), need)
+
+    def _body_features(self):
+        # 몸통 정보 10개: [직진/우회전/좌회전 방향의 여유 공간 3, 장애물까지 거리 3, 꼬리 위치(좌/우/상/하) 4]
+        head = self.snake[0]
+        cx, cy = int(head.x // BLOCK_SIZE), int(head.y // BLOCK_SIZE)
+        if not (0 <= cx < self.cols and 0 <= cy < self.rows):
+            return np.zeros(10, dtype=np.float32) # 벽 밖으로 나가 게임이 끝난 직후의 상태
+
+        cells = [(int(p.x // BLOCK_SIZE), int(p.y // BLOCK_SIZE)) for p in self.snake]
+        blocked = set(cells[1:]) # 충돌 판정과 같게 꼬리 칸도 막힌 칸으로 본다
+        occupied = 0             # 곧 비워질 꼬리를 뺀 나머지 몸통(머리 포함)의 비트보드
+        for x, y in cells[:-1]:
+            occupied |= 1 << (y * self.stride + x)
+        free = self.all_cells & ~occupied
+        length = len(cells)
+
+        idx = CLOCK_WISE.index(self.direction)
+        space, dist = [], []
+        for turn in (0, 1, -1): # 직진, 우회전, 좌회전 (action 0, 1, 2 와 같은 순서)
+            dx, dy = DIR_DELTA[CLOCK_WISE[(idx + turn) % 4]]
+            x, y, steps = cx + dx, cy + dy, 0
+            while 0 <= x < self.cols and 0 <= y < self.rows and (x, y) not in blocked:
+                steps += 1
+                x, y = x + dx, y + dy
+            dist.append(steps / max(self.cols, self.rows))
+            if steps == 0:
+                space.append(0.0) # 바로 앞이 벽/몸통
+            else:
+                seed = 1 << ((cy + dy) * self.stride + (cx + dx))
+                space.append(self._reachable(seed, free, length) / length) # 뱀 길이만큼 들어갈 공간이면 1
+
+        tail = self.snake[-1]
+        tail_pos = [tail.x < head.x, tail.x > head.x, tail.y < head.y, tail.y > head.y]
+        return np.array(space + dist + tail_pos, dtype=np.float32)
 
     def render(self):
         # pygame 이벤트 큐를 비워주어야 창이 '응답없음' 상태에 빠지지 않습니다.
