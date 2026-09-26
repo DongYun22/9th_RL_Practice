@@ -26,9 +26,10 @@ BLOCK_SIZE = 20
 SPEED = 40 # 학습 화면을 볼 때의 속도
 
 class SnakeGame:
-    def __init__(self, w=640, h=480):
+    def __init__(self, w=640, h=480, dist_reward=0.1):
         self.w = w
         self.h = h
+        self.dist_reward = dist_reward # 사과에 가까워지면 +dist_reward, 아니면 -dist_reward
         # 화면 출력용 (학습 속도를 높이려면 render() 호출을 생략하면 됩니다)
         self.display = pygame.display.set_mode((self.w, self.h))
         pygame.display.set_caption('Snake RL')
@@ -94,9 +95,9 @@ class SnakeGame:
         # 조밀한 보상 (Dense Reward) 적용
         curr_distance = abs(self.food.x - self.head.x) + abs(self.food.y - self.head.y)
         if curr_distance < self.prev_distance:
-            reward += 0.1
+            reward += self.dist_reward
         else:
-            reward -= 0.1
+            reward -= self.dist_reward
         self.prev_distance = curr_distance
 
         # 사과 획득 확인

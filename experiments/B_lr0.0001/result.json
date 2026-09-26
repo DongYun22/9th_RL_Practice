@@ -1,0 +1,7 @@
+{
+  "exp_name": "B_lr0.0001",
+  "episodes": 7000,
+  "total_steps": 1879618,
+  "last500_mean_score": 0.242,
+  "total_minutes": 3.484380034605662
+}

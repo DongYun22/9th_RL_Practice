@@ -1,0 +1,13 @@
+{
+  "exp_name": "D_A_dist0_ep20000_s1",
+  "episodes": 20000,
+  "seed": 1,
+  "policy_path": "",
+  "dist_reward": 0.0,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "epochs": 4,
+  "eps_clip": 0.2,
+  "update_timestep": 2000,
+  "entropy_coef": 0.01
+}

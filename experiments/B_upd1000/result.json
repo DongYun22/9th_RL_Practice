@@ -1,0 +1,7 @@
+{
+  "exp_name": "B_upd1000",
+  "episodes": 7000,
+  "total_steps": 9022762,
+  "last500_mean_score": 56.19,
+  "total_minutes": 15.807855602105459
+}

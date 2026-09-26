@@ -1,0 +1,13 @@
+{
+  "exp_name": "B_lr0.001",
+  "episodes": 7000,
+  "seed": 0,
+  "policy_path": "",
+  "dist_reward": 0.0,
+  "lr": 0.001,
+  "gamma": 0.99,
+  "epochs": 4,
+  "eps_clip": 0.2,
+  "update_timestep": 2000,
+  "entropy_coef": 0.01
+}

@@ -1,0 +1,15 @@
+{
+  "model": "saved_models/B_ent0.05/ppo_snake_final.pth",
+  "games": 5,
+  "seed": 1000,
+  "scores": [
+    8,
+    7,
+    9,
+    4,
+    7
+  ],
+  "mean": 7.0,
+  "max": 9,
+  "min": 4
+}

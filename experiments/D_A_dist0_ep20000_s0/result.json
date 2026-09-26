@@ -1,0 +1,7 @@
+{
+  "exp_name": "D_A_dist0_ep20000_s0",
+  "episodes": 20000,
+  "total_steps": 46915722,
+  "last500_mean_score": 78.722,
+  "total_minutes": 77.35640191237131
+}

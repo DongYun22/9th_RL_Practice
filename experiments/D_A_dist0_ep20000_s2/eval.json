@@ -1,0 +1,15 @@
+{
+  "model": "saved_models/D_A_dist0_ep20000_s2/ppo_snake_final.pth",
+  "games": 5,
+  "seed": 1000,
+  "scores": [
+    27,
+    21,
+    12,
+    40,
+    16
+  ],
+  "mean": 23.2,
+  "max": 40,
+  "min": 12
+}

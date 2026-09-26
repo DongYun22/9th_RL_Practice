@@ -48,10 +48,11 @@ class ActorCritic(nn.Module):
     
 # PPO 클래스
 class PPO:
-    def __init__(self, state_dim, action_dim, lr, gamma, epochs, eps_clip):
+    def __init__(self, state_dim, action_dim, lr, gamma, epochs, eps_clip, entropy_coef=0.01):
         self.gamma = gamma          # 할인율 (Discount Factor)
         self.eps_clip = eps_clip    # Clipping 범위 (보통 0.1 ~ 0.2)
         self.epochs = epochs        # 업데이트 반복 횟수
+        self.entropy_coef = entropy_coef # 엔트로피 보너스 가중치
 
         self.policy = ActorCritic(state_dim, action_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
@@ -107,7 +108,7 @@ class PPO:
             entropy_bonus = entropy.mean()
 
             # 역전파(Backprop)를 위해 전체 Loss 합산
-            loss = actor_loss + 0.5 * critic_loss - 0.01 * entropy_bonus
+            loss = actor_loss + 0.5 * critic_loss - self.entropy_coef * entropy_bonus
 
             # 실수값만 반환해 avg에 추가
             avg_actor_loss += actor_loss.item()
