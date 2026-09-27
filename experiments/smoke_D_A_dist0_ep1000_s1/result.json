@@ -1,0 +1,7 @@
+{
+  "exp_name": "smoke_D_A_dist0_ep1000_s1",
+  "episodes": 1000,
+  "total_steps": 200294,
+  "last500_mean_score": 0.122,
+  "total_minutes": 0.33594701687494916
+}

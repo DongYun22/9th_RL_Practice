@@ -1,0 +1,14 @@
+{
+  "exp_name": "smoke_S_basic_dist0.1_s1",
+  "episodes": 500,
+  "seed": 1,
+  "policy_path": "",
+  "dist_reward": 0.1,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "epochs": 4,
+  "eps_clip": 0.2,
+  "update_timestep": 2000,
+  "entropy_coef": 0.01,
+  "state_mode": "basic"
+}

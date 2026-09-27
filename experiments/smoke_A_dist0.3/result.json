@@ -1,0 +1,7 @@
+{
+  "exp_name": "smoke_A_dist0.3",
+  "episodes": 20,
+  "total_steps": 2024,
+  "last500_mean_score": 0.1,
+  "total_minutes": 0.004817696412404379
+}

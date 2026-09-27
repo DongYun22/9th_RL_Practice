@@ -1,0 +1,16 @@
+{
+  "model": "saved_models/smoke_S_body_dist0.1_s0/ppo_snake_ep500_score0.pth",
+  "state_mode": "body",
+  "games": 5,
+  "seed": 1000,
+  "scores": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "mean": 0.0,
+  "max": 0,
+  "min": 0
+}
