@@ -1,0 +1,7 @@
+{
+  "exp_name": "avoid_apple_s0",
+  "episodes": 7000,
+  "total_steps": 2322259,
+  "last500_mean_score": 0.024,
+  "total_minutes": 4.544412151972453
+}

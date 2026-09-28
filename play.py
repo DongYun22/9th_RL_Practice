@@ -6,7 +6,8 @@ from PPO_code import PPO
 def play_saved_model():
     # 가중치 불러오기
     # TODO: main.py에서 저장했던 모델 파일 경로 적기
-    model_path = "best_model/ppo_snake_best.pth"
+    model_path = "saved_models/avoid_apple_s0/ppo_snake_final.pth"
+    reward_mode = "avoid_apple"  # 사과 회피 목표로 학습한 모델을 볼 때는 "avoid_apple" 로 바꾸기
     weights = torch.load(model_path)
 
     # 저장된 가중치의 입력 크기로 상태 종류를 판별 (11: basic, 21: body)
@@ -15,7 +16,7 @@ def play_saved_model():
     # 뼈대 준비
     state_dim = STATE_DIMS[state_mode]
     action_dim = 3
-    env = SnakeGame(state_mode=state_mode)
+    env = SnakeGame(state_mode=state_mode, reward_mode=reward_mode)
 
     # PPO 모델 생성
     ppo_agent = PPO(state_dim, action_dim, lr=0.001, gamma=0.99, epochs=1, eps_clip=0.2)

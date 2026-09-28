@@ -31,10 +31,13 @@ CLOCK_WISE = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
 DIR_DELTA = {Direction.RIGHT: (1, 0), Direction.DOWN: (0, 1), Direction.LEFT: (-1, 0), Direction.UP: (0, -1)}
 
 class SnakeGame:
-    def __init__(self, w=640, h=480, dist_reward=0.1, state_mode="basic"):
+    def __init__(self, w=640, h=480, dist_reward=0.1, state_mode="basic", reward_mode="default"):
         self.w = w
         self.h = h
         self.dist_reward = dist_reward # 사과에 가까워지면 +dist_reward, 아니면 -dist_reward
+        if reward_mode not in ("default", "avoid_apple"):
+            raise ValueError(f"reward_mode 는 'default' 또는 'avoid_apple' 이어야 합니다: {reward_mode}")
+        self.reward_mode = reward_mode # avoid_apple: 목표를 뒤집어 사과를 피해 최대한 오래 생존하도록 함
         if state_mode not in STATE_DIMS:
             raise ValueError(f"state_mode 는 {list(STATE_DIMS)} 중 하나여야 합니다: {state_mode}")
         self.state_mode = state_mode
@@ -106,18 +109,20 @@ class SnakeGame:
             reward = -10
             return self.get_state(), reward, game_over
 
-        # 조밀한 보상 (Dense Reward) 적용
+        # 조밀한 보상 (Dense Reward) 적용 (avoid_apple: 목표가 반대이므로 부호도 반대)
         curr_distance = abs(self.food.x - self.head.x) + abs(self.food.y - self.head.y)
-        if curr_distance < self.prev_distance:
-            reward += self.dist_reward
+        closer = curr_distance < self.prev_distance
+        if self.reward_mode == "avoid_apple":
+            reward += -self.dist_reward if closer else self.dist_reward
         else:
-            reward -= self.dist_reward
+            reward += self.dist_reward if closer else -self.dist_reward
         self.prev_distance = curr_distance
 
-        # 사과 획득 확인
+        # 사과 획득 확인 (avoid_apple: 사과를 먹으면 페널티. score 는 그대로 "먹은 사과 수"로 기록해
+        # 이 목표에서는 낮을수록 좋은 지표가 됨)
         if self.head == self.food:
             self.score += 1
-            reward = 10
+            reward = -10 if self.reward_mode == "avoid_apple" else 10
             self._place_food()
             self.frame_iteration = 0 # 굶주림 초기화
             # 사과를 먹었으므로 꼬리를 자르지 않음 (길어짐)
